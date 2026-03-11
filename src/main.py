@@ -36,6 +36,7 @@ class Session:
         self.started_at: str = ""
         self.active = False
         self._whisper_in_progress = False
+        self._skip_requested = False
         self._log_file: str = ""
         self.event_log: list[dict] = []
         self.last_sent_timestamp: str | None = None
@@ -201,7 +202,7 @@ async def _do_whisper(session: Session, trigger_type: str) -> None:
         print("  ⚠ Whisper already in progress, skipping")
         return
 
-    if not session.transcript_buffer:
+    if not session.transcript_buffer and trigger_type != "challenge":
         print("  ⚠ No transcript data yet, skipping")
         return
 
@@ -210,24 +211,31 @@ async def _do_whisper(session: Session, trigger_type: str) -> None:
     next_sent_timestamp = session.last_sent_timestamp
 
     try:
-        # Evict old buffer entries
-        _evict_old_entries(session.transcript_buffer)
+        # For challenge triggers (e.g., initial prompt), use empty buffer
+        if trigger_type == "challenge":
+            payload_entries = []
+        else:
+            # Evict old buffer entries
+            _evict_old_entries(session.transcript_buffer)
 
-        payload_entries, next_sent_timestamp = _build_whisper_payload(
-            session.transcript_buffer,
-            session.last_sent_timestamp,
-            tail_entries=3,
-        )
-        if not payload_entries:
-            print("  ⚠ No new transcript since last whisper, skipping")
-            _log_event(session, "whisper_skipped_no_new_transcript")
-            return
+            payload_entries, next_sent_timestamp = _build_whisper_payload(
+                session.transcript_buffer,
+                session.last_sent_timestamp,
+                tail_entries=3,
+            )
+            if not payload_entries:
+                print("  ⚠ No new transcript since last whisper, skipping")
+                _log_event(session, "whisper_skipped_no_new_transcript")
+                return
 
-        if trigger_type == "manual" and not is_paused():
+        # Always pause listening during the entire whisper pipeline
+        # (LLM call + TTS playback) to prevent the coach's own voice
+        # from being captured by the mic and polluting the transcript.
+        if not is_paused():
             pause()
             paused_by_trigger = True
             _log_event(session, "transcription_paused", {
-                "reason": "manual_space_trigger",
+                "reason": f"{trigger_type}_whisper_pipeline",
             })
 
         result = await trigger_whisper(
@@ -245,6 +253,11 @@ async def _do_whisper(session: Session, trigger_type: str) -> None:
             session.previous_whispers.append(result.llm_response)
             session.last_sent_timestamp = next_sent_timestamp
 
+        # Clear buffer entries that were captured before/during this whisper
+        # so the coach's TTS residue doesn't leak into the next turn.
+        session.transcript_buffer.clear()
+        session.last_sent_timestamp = None
+
         # Reset speech counter after trigger
         reset_speech_seconds()
 
@@ -254,9 +267,17 @@ async def _do_whisper(session: Session, trigger_type: str) -> None:
         if paused_by_trigger:
             resume()
             _log_event(session, "transcription_resumed", {
-                "reason": "manual_space_trigger_complete",
+                "reason": f"{trigger_type}_whisper_pipeline_complete",
             })
         session._whisper_in_progress = False
+
+        # If skip was requested during this whisper, fire a fresh challenge
+        if session._skip_requested:
+            session._skip_requested = False
+            session.transcript_buffer.clear()
+            session.previous_whispers.clear()
+            session.last_sent_timestamp = None
+            asyncio.create_task(_do_whisper(session, "challenge"))
 
 
 # ── Timer trigger check ─────────────────────────────────────────────────────
@@ -302,6 +323,9 @@ async def _handle_key(key: str, session: Session) -> bool:
 
         # Start timer loop
         asyncio.create_task(_timer_loop(session))
+
+        # Auto-trigger initial challenge (empty buffer → prompt generates a challenge)
+        asyncio.create_task(_do_whisper(session, "challenge"))
         return True
 
     elif key == "q":
@@ -317,6 +341,22 @@ async def _handle_key(key: str, session: Session) -> bool:
             "buffer_entries": len(session.transcript_buffer),
         })
         asyncio.create_task(_do_whisper(session, "manual"))
+        return True
+
+    elif key == "n" and session.active:
+        # Skip to next challenge — reset all context for a fresh start
+        print("\n  ⏭ Skip requested")
+        abort_playback()
+        _log_event(session, "skip_to_next_challenge")
+        if session._whisper_in_progress:
+            # Let the running whisper finish, then its finally block fires challenge
+            session._skip_requested = True
+        else:
+            # No whisper running — clear context and fire immediately
+            session.transcript_buffer.clear()
+            session.previous_whispers.clear()
+            session.last_sent_timestamp = None
+            asyncio.create_task(_do_whisper(session, "challenge"))
         return True
 
     elif key == "x":

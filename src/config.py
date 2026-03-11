@@ -31,7 +31,7 @@ VAD_CHUNK_SIZE = 512          # samples per VAD frame (32ms at 16kHz)
 VAD_THRESHOLD = 0.5           # speech probability threshold
 BUFFER_MAX_AGE_MIN = 15       # rolling transcript window (minutes)
 DEFAULT_INTERVAL_MIN = 10     # trigger interval (minutes)
-DEFAULT_COACHING_MAX_WORDS = 20
+DEFAULT_COACHING_MAX_WORDS = 80
 
 TTS_VOICE = "en-US-AriaNeural"
 TTS_RATE = "-20%"
@@ -223,7 +223,8 @@ def print_config(config: Config) -> None:
 
     print("\n── Keyboard Controls ─────────────────────")
     print("  [s] Start session    [q] Quit")
-    print("  [space] Manual trigger")
+    print("  [space] Send my speech for feedback")
+    print("  [n] Skip to next challenge")
     print("  [x] Abort playback   [p] Pause/resume")
     print("  [1-5] Rate last whisper")
     print("──────────────────────────────────────────\n")
