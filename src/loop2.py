@@ -80,7 +80,7 @@ async def _call_openai(
             {"role": "user", "content": user_message},
         ],
         temperature=0.7,
-        max_tokens=60,
+        max_tokens=300,
     )
     return response.choices[0].message.content.strip()
 
@@ -106,7 +106,7 @@ async def _call_azure(
             {"role": "user", "content": user_message},
         ],
         temperature=0.7,
-        max_tokens=60,
+        max_tokens=300,
     )
     return response.choices[0].message.content.strip()
 
@@ -126,7 +126,7 @@ async def _call_anthropic(
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
         temperature=0.7,
-        max_tokens=60,
+        max_tokens=300,
     )
     return response.content[0].text.strip()
 
@@ -178,6 +178,11 @@ def _compress_coaching_text(text: str, max_words: int) -> str:
     if not normalized:
         return ""
 
+    # If the full text fits within max_words, return as-is (no sentence picking)
+    if len(normalized.split()) <= max_words:
+        return normalized
+
+    # Only pick the best sentence when we need to compress
     sentence_candidates = [
         s.strip() for s in re.split(r"(?<=[.!?])\s+", normalized) if s.strip()
     ]
@@ -266,10 +271,6 @@ async def trigger_whisper(
     result.transcript_chunk_length = len(transcript_text)
     if config.debug_logs:
         result.transcript_sent_to_llm = transcript_text
-
-    if not transcript_text.strip():
-        print("  ⚠ Empty transcript buffer, skipping whisper")
-        return result
 
     # 2. Load system prompt
     try:
