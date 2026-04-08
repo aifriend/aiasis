@@ -15,7 +15,7 @@ import numpy as np
 import sounddevice as sd
 from pydub import AudioSegment
 
-from config import Config, NO_OBSERVATION
+from config import Config
 
 
 # ── Types ────────────────────────────────────────────────────────────────────
@@ -79,8 +79,8 @@ async def _call_openai(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ],
-        temperature=0.7,
-        max_tokens=300,
+        temperature=config.temperature,
+        max_tokens=config.max_tokens,
     )
     return response.choices[0].message.content.strip()
 
@@ -105,8 +105,8 @@ async def _call_azure(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ],
-        temperature=0.7,
-        max_tokens=300,
+        temperature=config.temperature,
+        max_tokens=config.max_tokens,
     )
     return response.choices[0].message.content.strip()
 
@@ -125,8 +125,8 @@ async def _call_anthropic(
         model=config.llm_model,
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
-        temperature=0.7,
-        max_tokens=300,
+        temperature=config.temperature,
+        max_tokens=config.max_tokens,
     )
     return response.content[0].text.strip()
 
@@ -307,7 +307,7 @@ async def trigger_whisper(
     print(f"  💬 {result.llm_response}")
 
     # 5. Skip TTS if nothing notable
-    if result.llm_response.strip() == NO_OBSERVATION:
+    if result.llm_response.strip() == config.no_observation_text:
         print("  — No notable observations, skipping TTS")
         return result
 

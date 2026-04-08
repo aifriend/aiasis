@@ -22,3 +22,6 @@ certifi>=2024.0         # macOS SSL cert fix for Python.org builds
 
 # .env file loading
 python-dotenv>=1.0.0
+
+# Dashboard
+gradio>=5.0.0
