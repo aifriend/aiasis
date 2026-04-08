@@ -1,0 +1,44 @@
+{
+  "_meta": {
+    "preset_name": "Meeting Coach",
+    "description": "Strategic meeting coaching. Whispers one high-leverage insight per trigger."
+  },
+  "audio": {
+    "input_device": null,
+    "output_device": null,
+    "vad_threshold": 0.5,
+    "audio_queue_max": 200
+  },
+  "llm": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "temperature": 0.5,
+    "max_tokens": 60,
+    "base_url": null,
+    "api_version": null
+  },
+  "stt": {
+    "deepgram_model": "flux-general-en",
+    "eot_threshold": 0.7,
+    "connection_retries": 3,
+    "connection_timeout": 15
+  },
+  "tts": {
+    "voice": "en-US-GuyNeural",
+    "rate": "-10%",
+    "volume": "-20%",
+    "pitch": "+0Hz"
+  },
+  "session": {
+    "trigger_interval_min": 10,
+    "coaching_max_words": 20,
+    "buffer_max_age_min": 15,
+    "timer_check_interval_sec": 5,
+    "tail_context_entries": 3,
+    "no_observation_text": "No notable observations.",
+    "debug_logs": false
+  },
+  "prompt": {
+    "file": "prompts/v1.txt"
+  }
+}

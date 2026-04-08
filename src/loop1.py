@@ -12,7 +12,7 @@ import sounddevice as sd
 import torch
 import websockets
 
-from config import Config, SAMPLE_RATE, VAD_CHUNK_SIZE, VAD_THRESHOLD
+from config import Config
 
 # ── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,11 +49,13 @@ def _load_vad() -> torch.jit.ScriptModule:
 def _is_speech(chunk_int16: np.ndarray) -> bool:
     """Run Silero VAD on a single chunk. Returns True if speech detected."""
     vad = _load_vad()
+    sr = _current_config.sample_rate if _current_config else 16000
+    threshold = _current_config.vad_threshold if _current_config else 0.5
     # int16 → float32 normalized to [-1, 1]
     audio_float = chunk_int16.astype(np.float32) / 32768.0
     tensor = torch.from_numpy(audio_float.squeeze())
-    prob = vad(tensor, SAMPLE_RATE).item()
-    return prob >= VAD_THRESHOLD
+    prob = vad(tensor, sr).item()
+    return prob >= threshold
 
 
 # ── Deepgram v2 Flux WebSocket ───────────────────────────────────────────────
@@ -62,10 +64,10 @@ def _build_deepgram_url(config: Config) -> str:
     """Build the Deepgram v2 Flux WebSocket URL with query params."""
     base = "wss://api.deepgram.com/v2/listen"
     params = (
-        "model=flux-general-en"
+        f"model={config.deepgram_model}"
         "&encoding=linear16"
-        f"&sample_rate={SAMPLE_RATE}"
-        "&eot_threshold=0.7"
+        f"&sample_rate={config.sample_rate}"
+        f"&eot_threshold={config.eot_threshold}"
         "&eot_timeout_ms=5000"
     )
     return f"{base}?{params}"
@@ -76,22 +78,24 @@ async def _connect_deepgram(config: Config) -> websockets.WebSocketClientProtoco
     url = _build_deepgram_url(config)
     headers = {"Authorization": f"Token {config.deepgram_api_key}"}
     last_error: Exception | None = None
-    for attempt in range(1, 4):
+    retries = config.connection_retries
+    timeout = config.connection_timeout
+    for attempt in range(1, retries + 1):
         try:
             ws = await websockets.connect(
                 url,
                 additional_headers=headers,
-                open_timeout=15,
+                open_timeout=timeout,
             )
             print("  ✓ Deepgram v2 Flux connected")
             return ws
         except Exception as e:
             last_error = e
-            if attempt < 3:
-                print(f"  ⚠ Deepgram connect failed (attempt {attempt}/3): {e}")
+            if attempt < retries:
+                print(f"  ⚠ Deepgram connect failed (attempt {attempt}/{retries}): {e}")
                 await asyncio.sleep(1.5 * attempt)
 
-    raise TimeoutError(f"Deepgram connection failed after 3 attempts: {last_error}")
+    raise TimeoutError(f"Deepgram connection failed after {retries} attempts: {last_error}")
 
 
 async def _receive_transcripts(
@@ -192,7 +196,7 @@ async def _audio_processor(
     """Consume audio queue: VAD filter → send speech to Deepgram."""
     global _ws, _running, _speech_seconds
 
-    chunk_duration = VAD_CHUNK_SIZE / SAMPLE_RATE  # seconds per chunk
+    chunk_duration = config.vad_chunk_size / config.sample_rate  # seconds per chunk
 
     while _running:
         try:
@@ -238,7 +242,7 @@ async def start_listening(
     _paused = False
     _speech_seconds = 0.0
     _dropped_audio_frames = 0
-    _audio_queue = asyncio.Queue(maxsize=200)
+    _audio_queue = asyncio.Queue(maxsize=config.audio_queue_max)
 
     loop = asyncio.get_event_loop()
 
@@ -258,8 +262,8 @@ async def start_listening(
         _schedule_audio_chunk(loop, indata.copy())
 
     _stream = sd.InputStream(
-        samplerate=SAMPLE_RATE,
-        blocksize=VAD_CHUNK_SIZE,
+        samplerate=config.sample_rate,
+        blocksize=config.vad_chunk_size,
         device=config.input_device,
         channels=1,
         dtype="int16",

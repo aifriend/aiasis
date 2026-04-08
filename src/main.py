@@ -11,7 +11,7 @@ import tty
 from datetime import datetime
 from pathlib import Path
 
-from config import Config, BUFFER_MAX_AGE_MIN, parse_config, print_config
+from config import Config, parse_config, print_config
 from loop1 import (
     start_listening,
     stop_listening,
@@ -62,9 +62,9 @@ def _restore_terminal() -> None:
 
 # ── Rolling buffer management ────────────────────────────────────────────────
 
-def _evict_old_entries(buffer: list[TranscriptEntry]) -> None:
-    """Remove entries older than BUFFER_MAX_AGE_MIN from the buffer."""
-    cutoff = time.time() - (BUFFER_MAX_AGE_MIN * 60)
+def _evict_old_entries(buffer: list[TranscriptEntry], buffer_max_age_min: int = 15) -> None:
+    """Remove entries older than buffer_max_age_min from the buffer."""
+    cutoff = time.time() - (buffer_max_age_min * 60)
     # Entries have ISO timestamps — compare via datetime
     i = 0
     while i < len(buffer):
@@ -216,12 +216,12 @@ async def _do_whisper(session: Session, trigger_type: str) -> None:
             payload_entries = []
         else:
             # Evict old buffer entries
-            _evict_old_entries(session.transcript_buffer)
+            _evict_old_entries(session.transcript_buffer, session.config.buffer_max_age_min)
 
             payload_entries, next_sent_timestamp = _build_whisper_payload(
                 session.transcript_buffer,
                 session.last_sent_timestamp,
-                tail_entries=3,
+                tail_entries=session.config.tail_context_entries,
             )
             if not payload_entries:
                 print("  ⚠ No new transcript since last whisper, skipping")
@@ -287,7 +287,7 @@ async def _timer_loop(session: Session) -> None:
     interval_sec = session.config.trigger_interval_min * 60
 
     while session.active:
-        await asyncio.sleep(5)  # check every 5 seconds
+        await asyncio.sleep(session.config.timer_check_interval_sec)
 
         if not session.active:
             break
