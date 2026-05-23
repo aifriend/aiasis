@@ -35,3 +35,6 @@ config/active.json
 *.mp3
 *.wav
 !prompts/*.wav
+
+# Claude Code (personal/machine-local settings stay local; shared config is committed)
+.claude/settings.local.json
