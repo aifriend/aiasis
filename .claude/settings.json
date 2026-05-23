@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreCommit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'SECRETS=$(git diff --cached --diff-filter=ACM -z --name-only | xargs -0 grep -lnE \"(sk-[a-zA-Z0-9]{20,}|sk-ant-[a-zA-Z0-9]{20,}|dg-[a-zA-Z0-9]{20,}|[A-Z_]*API_KEY\\s*=\\s*[\\\"'\\'']{1}[a-zA-Z0-9]{10,})\" 2>/dev/null || true); if [ -n \"$SECRETS\" ]; then echo \"🚨 BLOCKED: Possible API keys found in staged files:\"; echo \"$SECRETS\"; echo \"Remove secrets and use env vars instead.\"; exit 1; fi; echo \"✓ No secrets detected\"'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'FILE=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; case \"$FILE\" in */prompts/*.txt) WORDS=$(wc -w < \"$FILE\" | tr -d \" \"); if [ \"$WORDS\" -gt 500 ]; then echo \"⚠ Prompt has $WORDS words (limit: 500). Consider trimming.\"; fi; if grep -qiE \"^(Hello|Hi |Sure|Of course)\" \"$FILE\"; then echo \"⚠ Prompt starts with a greeting pattern. Remove preamble.\"; fi; if ! grep -qiE \"(output rules|output format|constraints|rules)\" \"$FILE\"; then echo \"⚠ Prompt may be missing output constraint section.\"; fi; echo \"✓ Prompt validation complete ($WORDS words)\";; esac'"
+          }
+        ]
+      }
+    ]
+  }
+}
