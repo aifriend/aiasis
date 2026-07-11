@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v8
+      - uses: astral-sh/setup-uv@v8.3.2
       - name: System audio lib for sounddevice
         run: sudo apt-get update && sudo apt-get install -y libportaudio2
       - name: Install deps (CPU torch)
