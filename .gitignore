@@ -37,4 +37,5 @@ config/active.json
 !prompts/*.wav
 
 # Claude Code (personal/machine-local settings stay local; shared config is committed)
-.claude/settings.local.json
+.claude/
+CLAUDE.md

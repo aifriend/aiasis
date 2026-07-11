@@ -178,8 +178,7 @@ These logs are the substrate for prompt iteration. Compare ratings across prompt
 ├── prompts/                # Versioned coaching prompts (v1.txt, v2.txt, ...)
 ├── docs/
 │   └── aiasis-poc.md       # Product / validation plan
-├── logs/                   # Session logs (gitignored)
-└── CLAUDE.md               # Internal project instructions
+└── logs/                   # Session logs (gitignored)
 ```
 
 ## Roadmap
