@@ -1,0 +1,21 @@
+name: CI
+on:
+  push:
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v8
+      - name: System audio lib for sounddevice
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+      - name: Install deps (CPU torch)
+        run: |
+          uv venv -p 3.13 .venv
+          uv pip install -p .venv/bin/python --torch-backend=cpu -r requirements.txt
+      - name: Run unit tests
+        run: .venv/bin/python -m unittest discover -s src -p "test_*.py" -v
