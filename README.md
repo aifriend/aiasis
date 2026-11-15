@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <img alt="CI" src="https://github.com/aifriend/aiasis/actions/workflows/ci.yml/badge.svg">
   <img alt="Python"   src="https://img.shields.io/badge/python-3.11+-blue.svg">
   <img alt="Deepgram" src="https://img.shields.io/badge/Deepgram-13ef93?style=flat">
   <img alt="OpenAI"   src="https://img.shields.io/badge/OpenAI-412991?style=flat&logo=openai&logoColor=white">
@@ -97,6 +98,20 @@ export LLM_MODEL="gpt-4o-mini"
 python src/main.py
 ```
 
+## Dashboard and presets
+
+A Gradio dashboard edits the configuration without touching the command line. Start it from the project root:
+
+```bash
+python src/dashboard.py
+```
+
+It serves on `http://127.0.0.1:7860` with tabs for Audio, LLM, STT, TTS, Session, Prompt, Presets and Logs. Changes are saved to `config/active.json` (gitignored), which `src/main.py` reads on the next run. API keys are never written to that file; they stay in environment variables.
+
+Settings are resolved in this order: CLI flags, then `config/active.json`, then environment variables, then built-in defaults.
+
+A preset is a complete coaching setup (prompt, LLM tuning, voice, session behaviour) stored in `config/presets/`. Three ship with the repo: `english-coach`, `interview-prep` and `meeting-coach`. In the Presets tab you can load, apply to the active config, save the current settings as a new preset, or delete one.
+
 ## Audio device setup
 
 List devices first:
@@ -122,7 +137,8 @@ python src/main.py \
   --output-device 4 \
   --prompt prompts/v1.txt \
   --interval 10 \
-  --max-words 20 \
+  --max-words 80 \
+  --debug-logs \
   --llm-provider openai \
   --llm-model gpt-4o-mini
 ```
@@ -130,8 +146,9 @@ python src/main.py \
 | Flag | Default | Meaning |
 |---|---|---|
 | `--prompt` | latest `prompts/vN.txt` | Coaching prompt to use |
-| `--interval` | (off — manual only) | Auto-trigger after N minutes of accumulated speech |
-| `--max-words` | 20 (≥5 required) | Hard cap on the spoken coaching suggestion |
+| `--interval` | 10 | Auto-trigger after N minutes of accumulated speech |
+| `--max-words` | 80 (≥5 required) | Hard cap on the spoken coaching suggestion |
+| `--debug-logs` | off | Add event markers, the transcript sent to the LLM and the spoken text to the session log (see Session logs) |
 | `--llm-provider` | env | Override `LLM_PROVIDER` |
 | `--llm-model` | env | Override `LLM_MODEL` |
 
@@ -142,6 +159,7 @@ python src/main.py \
 | `s` | Start session |
 | `q` | Stop and quit |
 | `space` | Manual whisper trigger |
+| `n` | Skip to the next challenge: aborts playback, clears the transcript and whisper history, and starts a fresh challenge |
 | `x` | Abort current TTS playback |
 | `p` | Pause / resume transcription |
 | `1`–`5` | Rate the last whisper |
@@ -150,8 +168,9 @@ python src/main.py \
 
 Each run produces `logs/session-YYYY-MM-DD-HHMMSS.jsonl`. One JSON object per line. Includes:
 
-- Event markers (manual trigger, pause/resume, playback start/end)
+- Event markers (manual trigger, pause/resume, playback start/end) — only with `--debug-logs`
 - Whisper entries — trigger type, LLM response, duration, rating, abort flag, prompt version
+- With `--debug-logs`, each whisper entry also carries the transcript sent to the LLM and the spoken text
 - Session summary — start/end, average rating, abort count, total duration
 
 These logs are the substrate for prompt iteration. Compare ratings across prompt versions to see which framing actually helps in the moment.
@@ -168,16 +187,16 @@ These logs are the substrate for prompt iteration. Compare ratings across prompt
 ```
 .
 ├── src/
-│   ├── main.py             # Entry point + keyboard loop
-│   ├── audio_in.py         # Mic capture + VAD
-│   ├── stt.py              # Deepgram streaming client
-│   ├── transcript.py       # Rolling buffer + window selection
-│   ├── llm.py              # Multi-provider LLM wrapper
-│   ├── tts.py              # Text-to-speech playback
-│   └── logger.py           # JSONL session logger
+│   ├── main.py             # Entry point, session state, keyboard loop, session logs
+│   ├── loop1.py            # Loop 1: mic capture, VAD, Deepgram streaming STT
+│   ├── loop2.py            # Loop 2: LLM call, TTS synthesis and playback
+│   ├── config.py           # CLI args, env vars, config/active.json, startup checks
+│   └── dashboard.py        # Gradio dashboard for config, presets, prompts and logs
+├── config/
+│   └── presets/            # Coaching presets (english-coach, interview-prep, meeting-coach)
 ├── prompts/                # Versioned coaching prompts (v1.txt, v2.txt, ...)
-├── docs/
-│   └── aiasis-poc.md       # Product / validation plan
+├── tests/                  # pytest suite
+├── docs/                   # Product / validation plan and design notes
 └── logs/                   # Session logs (gitignored)
 ```
 
