@@ -1,14 +1,10 @@
 """Unit tests for Loop 1 queue overflow handling."""
 
 import asyncio
-import sys
-from pathlib import Path
 import unittest
 from unittest.mock import AsyncMock, patch
 
 import numpy as np
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import loop1
 

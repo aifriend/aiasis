@@ -1,11 +1,7 @@
 """Unit tests for graceful startup failure handling."""
 
-import sys
-from pathlib import Path
 import unittest
 from unittest.mock import AsyncMock, patch
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import Config
 from main import Session, _handle_key, _teardown

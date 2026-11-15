@@ -1,10 +1,6 @@
 """Unit tests for incremental whisper payload selection."""
 
-import sys
-from pathlib import Path
 import unittest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from main import _build_whisper_payload
 
