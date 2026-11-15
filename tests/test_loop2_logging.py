@@ -1,11 +1,7 @@
 """Unit tests for Loop 2 playback event logging hooks."""
 
-import sys
-from pathlib import Path
 import unittest
 from unittest.mock import AsyncMock, patch
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import Config
 from loop2 import trigger_whisper
