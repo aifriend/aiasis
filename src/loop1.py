@@ -146,6 +146,7 @@ async def _receive_transcripts(
                 except Exception as e:
                     print(f"  ✖ Reconnect failed: {e}")
                     await asyncio.sleep(5)
+                continue
             break
         except json.JSONDecodeError as e:
             print(f"  ⚠ Bad JSON from Deepgram: {e}")
